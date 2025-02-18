@@ -1,0 +1,20 @@
+
+--- Test Generation Started ---
+Model: codegemma:latest
+Date: 2024-12-02
+Start Time: 16:56:30
+Folder: /Users/berkant/Desktop/Eval Projects
+
+Generated: /Users/berkant/Desktop/Eval Projects/Tests/unit_test_json_handler_codegemma:latest.py and /Users/berkant/Desktop/Eval Projects/Tests/unit_test_json_handler_codegemma:latest.md for /Users/berkant/Desktop/Eval Projects/JSON-Handler/json_handler.py at 16:57:04
+Completed: /Users/berkant/Desktop/Eval Projects/JSON-Handler/json_handler.py at 16:57:04
+Generated: /Users/berkant/Desktop/Eval Projects/Tests/unit_test_isbn_num_val_codegemma:latest.py and /Users/berkant/Desktop/Eval Projects/Tests/unit_test_isbn_num_val_codegemma:latest.md for /Users/berkant/Desktop/Eval Projects/ISBN-Validator/isbn_num_val.py at 16:57:05
+Completed: /Users/berkant/Desktop/Eval Projects/ISBN-Validator/isbn_num_val.py at 16:57:05
+Generated: /Users/berkant/Desktop/Eval Projects/Tests/unit_test_num_to_words_codegemma:latest.py and /Users/berkant/Desktop/Eval Projects/Tests/unit_test_num_to_words_codegemma:latest.md for /Users/berkant/Desktop/Eval Projects/Number-To-Words/num_to_words.py at 16:57:05
+Completed: /Users/berkant/Desktop/Eval Projects/Number-To-Words/num_to_words.py at 16:57:05
+Generated: /Users/berkant/Desktop/Eval Projects/Tests/unit_test_address_book_codegemma:latest.py and /Users/berkant/Desktop/Eval Projects/Tests/unit_test_address_book_codegemma:latest.md for /Users/berkant/Desktop/Eval Projects/Address-Book/address_book.py at 16:57:24
+Completed: /Users/berkant/Desktop/Eval Projects/Address-Book/address_book.py at 16:57:24
+
+--- Test Generation Completed ---
+End Time: 16:57:24
+Elapsed Time: 0:00:53.794162
+
