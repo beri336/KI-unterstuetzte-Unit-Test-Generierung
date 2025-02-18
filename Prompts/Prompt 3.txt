@@ -1,0 +1,7 @@
+Write a Unit Test for the following Python code. Focus on testing:
+- Positive cases (where the function behaves as expected)
+- Edge cases (input that might cause failures)
+- Negative cases (where the function should throw errors or return incorrect results)
+- Performance tests if applicable
+- Include comments to explain the purpose of each test case.
+{code}

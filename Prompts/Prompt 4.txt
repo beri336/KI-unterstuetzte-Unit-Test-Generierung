@@ -1,0 +1,8 @@
+Write me a Unit Test for the following Python code. Break the process into multiple tests:
+- One function per test case.
+- Each test should have a clear and descriptive name indicating what it tests (e.g., 'test_function_name_valid_input', 'test_function_name_edge_case', etc.)
+- Include normal cases, edge cases, and cases that should raise exceptions.
+- Add comments to each test cases.
+- Write the test functions step by step, explaining each part before moving on.
+- filename: "{filename).py"
+{code}

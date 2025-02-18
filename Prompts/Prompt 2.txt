@@ -1,0 +1,1 @@
+Write me a Unit Test for the following Python Code, write comments and add special cases and edge cases: {code}
