@@ -11,6 +11,7 @@ import os
 import subprocess
 import concurrent.futures # for parallel processing
 import threading # for GUI responsiveness
+import psutil # check Ollama-process
 
 
 # global variables
@@ -29,6 +30,7 @@ def chose_folder():
         tb_chosen_folder.delete("1.0", tk.END)
         tb_chosen_folder.insert("1.0", folder_path)
         tb_chosen_folder.config(state="disabled")
+    print(f"Your chosen file: '{folder_path}'")
 
 def chose_prompt_file():
     """
@@ -46,6 +48,7 @@ def chose_prompt_file():
             tb_chosen_prompt_file.delete("1.0", tk.END)
             tb_chosen_prompt_file.insert("1.0", file_content)
             tb_chosen_prompt_file.config(state="disabled")
+        print(f"Your chosen prompt: '{file_content}'")
 
 def fetch_models():
     """
@@ -58,7 +61,7 @@ def fetch_models():
         # loop through output lines and extract only the model name (first column)
         model_names = [line.split()[0] for line in result.stdout.splitlines() if not line.startswith("NAME")]
         
-        print(model_names)
+        print(f"All available models: {model_names}")
         return model_names
     except subprocess.CalledProcessError as e:
         print(f"Fehler beim Abrufen der Modelle mit 'ollama list': {e}")
@@ -71,6 +74,7 @@ def on_model_select(event):
     global selected_model
     selected_model = combo_models.get()
     btn_generate.config(text=f"Generate Unit Test with '{selected_model}'" if selected_model else "Generate")
+    print(f"Model selected: '{selected_model}'")
 
 def generate_tests():
     """
@@ -79,6 +83,9 @@ def generate_tests():
     if not selected_model:
         print("Please select an AI model.")
         return
+    
+    # update status label to show that generation has started
+    status_label.config(text="Generating, please wait...")
 
     # run the generation in a separate thread to keep GUI responsive
     threading.Thread(target=generate_tests_for_folder, args=(selected_model,), daemon=True).start()
@@ -110,6 +117,12 @@ def generate_tests_for_folder(model_name):
                 print(f"Completed test generation for {filename}")
             except Exception as e:
                 print(f"Error generating test for {filename}: {e}")
+    
+    # update status label to show that generation is done
+    status_label.config(text="Done")
+
+    # revert status to "Ready" after 6 seconds
+    root.after(6000, lambda: status_label.config(text="Ready"))
     print("\nAll tests successfully generated.")
 
 def generate_test_for_file(model_name, prompt_text, filename, tests_folder):
@@ -148,10 +161,25 @@ def generate_test_for_file(model_name, prompt_text, filename, tests_folder):
     with open(test_filename, "w", encoding="utf-8") as test_file:
         test_file.write("\n".join(python_code_lines))
 
+def check_ollama_status():
+    """
+    Check if the Ollama process is running and update the status label.
+    """
+    ollama_running = any("ollama" in proc.name().lower() for proc in psutil.process_iter(['name']))
+    if ollama_running:
+        ollama_status_label.config(text="Online", fg="green")
+    else:
+        ollama_status_label.config(text="Offline", fg="red")
+    
+    # schedule this function to run again after 5000ms (5 seconds)
+    root.after(5000, check_ollama_status)
+    print("Checking status for Ollama...")
+
+
 # GUI setup
 root = tk.Tk()
-root.minsize(580, 380)
-root.maxsize(580, 380)
+root.maxsize(580, 460)
+root.minsize(580, 460)
 root.title("AI Unit Test")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
@@ -169,6 +197,12 @@ frame_three.pack(side="top", padx=10, pady=10, fill="x")
 
 frame_four = tk.Frame(main_frame)
 frame_four.pack(side="top", padx=10, pady=10, fill="x")
+
+frame_five = tk.Frame(main_frame)
+frame_five.pack(side="top", padx=10, pady=10, fill="x")
+
+frame_six = tk.Frame(main_frame)
+frame_six.pack(side="top", padx=10, pady=10, fill="x")
 
 # frame one - selected folder
 lbl_chosen_folder = tk.Label(frame_one, text="Selected Folder:", fg="white", font=("Arial", 12))
@@ -204,5 +238,15 @@ combo_models.bind("<<ComboboxSelected>>", on_model_select)
 # frame four - generate button
 btn_generate = tk.Button(frame_four, text="Generate", command=generate_tests)
 btn_generate.pack(side="top", pady=5, fill="x")
+
+# frame five - status label
+status_label = tk.Label(frame_five, text="Ready", fg="green", font=("Arial", 12))
+status_label.pack(pady=5, anchor="w")
+
+# frame six - Ollama status label
+ollama_status_label = tk.Label(frame_six, text="Checking...", fg="orange", font=("Arial", 12))
+ollama_status_label.pack(pady=5, anchor="w")
+
+check_ollama_status() # Start the Ollama status check
 
 root.mainloop()
