@@ -12,6 +12,7 @@ import subprocess
 import concurrent.futures # for parallel processing
 import threading # for GUI responsiveness
 import psutil # check Ollama-process
+import time # to measure time
 
 
 # global variables
@@ -80,10 +81,15 @@ def generate_tests():
     """
     Trigger the test generation process using the selected model.
     """
+    global generation_start_time
+
     if not selected_model:
         print("Please select an AI model.")
         return
     
+    # set the start time for generation
+    generation_start_time = time.time()
+
     # update status label to show that generation has started
     status_label.config(text="Generating, please wait...")
 
@@ -117,13 +123,17 @@ def generate_tests_for_folder(model_name):
                 print(f"Completed test generation for {filename}")
             except Exception as e:
                 print(f"Error generating test for {filename}: {e}")
-    
-    # update status label to show that generation is done
-    status_label.config(text="Done")
+
+    # calculate total elapsed time
+    elapsed_time = time.time() - generation_start_time
+    formatted_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
+
+    # update the GUI and print to terminal
+    status_label.config(text=f"Done in {formatted_time}")
+    print(f"All tests successfully generated in {formatted_time}")
 
     # revert status to "Ready" after 6 seconds
     root.after(6000, lambda: status_label.config(text="Ready"))
-    print("\nAll tests successfully generated.")
 
 def generate_test_for_file(model_name, prompt_text, filename, tests_folder):
     file_path = os.path.join(folder_path, filename)
@@ -178,8 +188,8 @@ def check_ollama_status():
 
 # GUI setup
 root = tk.Tk()
-root.maxsize(580, 460)
 root.minsize(580, 460)
+root.maxsize(580, 460)
 root.title("AI Unit Test")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
