@@ -101,6 +101,7 @@ def on_model_select(event):
     Adjusts the button text to reflect the chosen model.
     """
     global selected_model
+
     selected_model = combo_models.get()
     btn_generate.config(text=f"Generate Unit Test with '{selected_model}'" if selected_model else "Generate")
     print(f"Model selected: '{selected_model}'")
@@ -153,20 +154,29 @@ def generate_tests_for_folder(model_name):
         log_file.write(f"Start Time: {start_time.strftime('%H:%M:%S')}\n")
         log_file.write(f"Folder: {folder_path}\n\n")
 
-        py_files = [f for f in os.listdir(folder_path) if f.endswith(".py")]
+        # find all .py-files in the folder and all subfolders
+        py_files = []
+        for root, _, files in os.walk(folder_path):
+            for file in files:
+                if file.endswith(".py"):
+                    py_files.append(os.path.join(root, file))
+        print(f"\033[33m PYFILES {py_files} \033[0m")
 
         # use concurrent futures ThreadPoolExecutor to parallelize test generation
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder, log_file): file for file in py_files}
+            futures = {
+                executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder, log_file): file
+                for file in py_files
+            }
             for future in concurrent.futures.as_completed(futures):
                 filename = futures[future]
                 try:
                     future.result()
-                    print(f"Completed test generation for {filename}")
-                    log_file.write(f"Completed: {filename} at {datetime.now().strftime('%H:%M:%S')}\n")
+                    print(f"Test-Generierung abgeschlossen für {filename}")
+                    log_file.write(f"Abgeschlossen: {filename} um {datetime.now().strftime('%M:%S')}\n")
                 except Exception as e:
-                    print(f"Error generating test for {filename}: {e}")
-                    log_file.write(f"Error generating test for {filename}: {e}\n")
+                    print(f"Fehler bei der Generierung des Tests für {filename}: {e}")
+                    log_file.write(f"Fehler bei der Generierung des Tests für {filename}: {e}\n")
         # log completion time
         end_time = datetime.now()
         elapsed_time = end_time - start_time
@@ -246,9 +256,9 @@ def check_ollama_status():
 
 # GUI setup
 root = tk.Tk()
-root.minsize(570, 420) # X,Y
-root.maxsize(570, 420)
-root.title("AI Unit Test")
+root.minsize(560, 420) # X,Y
+root.maxsize(560, 420)
+root.title("Unit Test with AI")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
 # set up frames for GUI sections
