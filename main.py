@@ -20,6 +20,7 @@ folder_path = None
 selected_model = None
 generation_thread = None # keep track of the generation thread
 excluded_folder_path = None # track exclude folder
+model_names_cache = [] # use cache (if available) to fetch models faster
 
 
 def chose_folder():
@@ -111,6 +112,11 @@ def fetch_models():
     Returns a list of model names.
     If an error occurs, prints an error message.
     """
+    global model_names_cache
+
+    if model_names_cache: # return cached models if available
+        return model_names_cache
+    
     try:
         # executes `ollama list` in terminal
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=True)
