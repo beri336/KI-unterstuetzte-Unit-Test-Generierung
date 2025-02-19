@@ -23,6 +23,17 @@ excluded_folder_path = None # track exclude folder
 model_names_cache = [] # use cache (if available) to fetch models faster
 
 
+def terminal_debugging(message):
+    print(f"\033[34m{message}\033[0m")
+
+def terminal_standard(message):
+    print(f"\033[33m{message}\033[0m")
+
+def terminal_error(message):
+    print(f"\033[41m{message}\033[0m") 
+
+terminal_debugging("gregdjjjfjfjf")
+
 def chose_folder():
     """
     Opens a file dialog to select a folder containing Python files.
@@ -57,10 +68,10 @@ def chose_folder():
                 tb_chosen_prompt_file.delete("1.0", tk.END)
                 tb_chosen_prompt_file.insert("1.0", file_content)
                 tb_chosen_prompt_file.config(state="disabled")
-            print(f"Automatically found prompt file: '{prompt_file_path}'")
+            terminal_standard(f"Automatically found prompt file: '{prompt_file_path}'")
         else:
-            print("No prompt file found in the selected folder.")
-    print(f"Your selected folder: '{folder_path}'")
+            terminal_error("No prompt file found in the selected folder.")
+    terminal_standard(f"Your selected folder: '{folder_path}'")
 
 
 def chose_exclude_folder():
@@ -71,7 +82,7 @@ def chose_exclude_folder():
     global excluded_folder_path
 
     if not folder_path:
-        print("No main folder selected.")
+        terminal_error("No main folder selected.")
         return
 
     excluded_folder_path = filedialog.askdirectory(title="Choose a Subfolder to Exclude")
@@ -80,9 +91,9 @@ def chose_exclude_folder():
         tb_excluded_folder.delete("1.0", tk.END)
         tb_excluded_folder.insert("1.0", excluded_folder_path)
         tb_excluded_folder.config(state="disabled")
-        print(f"Excluded folder: '{excluded_folder_path}'")
+        terminal_standard(f"Excluded folder: '{excluded_folder_path}'")
     else:
-        print("The excluded folder must be a subfolder of the main folder.")
+        terminal_error("The excluded folder must be a subfolder of the main folder.")
         excluded_folder_path = None
 
 
@@ -103,7 +114,7 @@ def chose_prompt_file():
             tb_chosen_prompt_file.delete("1.0", tk.END)
             tb_chosen_prompt_file.insert("1.0", file_content)
             tb_chosen_prompt_file.config(state="disabled")
-        print(f"Your chosen prompt: '{file_content}'")
+        terminal_standard(f"Your chosen prompt: '{file_content}'")
 
 
 def fetch_models():
@@ -124,10 +135,10 @@ def fetch_models():
         # loop through output lines and extract only the model name (first column)
         model_names = [line.split()[0] for line in result.stdout.splitlines() if not line.startswith("NAME")]
 
-        print(f"All available models: {model_names}")
+        terminal_standard(f"All available models: {model_names}")
         return model_names
     except subprocess.CalledProcessError as e:
-        print(f"Error fetching models with 'ollama list': {e}")
+        terminal_error(f"Error fetching models with 'ollama list': {e}")
         return [] # empty list if fetching fails
 
 
@@ -140,7 +151,7 @@ def on_model_select(event):
 
     selected_model = combo_models.get()
     btn_generate.config(text=f"Generate Unit Test with '{selected_model}'" if selected_model else "Generate")
-    print(f"Model selected: '{selected_model}'")
+    terminal_standard(f"Model selected: '{selected_model}'")
 
 
 def generate_tests():
@@ -151,7 +162,7 @@ def generate_tests():
     global generation_thread
 
     if not selected_model:
-        print("Please select an AI model.")
+        terminal_error("Please select an AI model.")
         return
 
     status_label.config(text="Generating, please wait...", fg="orange")
@@ -167,6 +178,7 @@ def check_generation_completion():
     if generation_thread and generation_thread.is_alive():
         root.after(1000, check_generation_completion)
     else:
+        terminal_standard("Done generating all Tests.")
         show_done_label() # display "Done" when the generation completes
 
 
@@ -183,7 +195,7 @@ def generate_tests_for_folder(model_name):
     global folder_path
 
     if not folder_path:
-        print("No folder selected.")
+        terminal_error("No folder selected.")
         return
 
     # create Tests-folder in the root of the selected folder
@@ -223,10 +235,10 @@ def generate_tests_for_folder(model_name):
                 filename = futures[future]
                 try:
                     future.result()
-                    print(f"Test generation completed for {filename}")
+                    terminal_standard(f"Test generation completed for {filename}")
                     log_file.write(f"Completed: {filename} at {datetime.now().strftime('%M:%S')}\n")
                 except Exception as e:
-                    print(f"Error generating test for {filename}: {e}")
+                    terminal_error(f"Error generating test for {filename}: {e}")
                     log_file.write(f"Error generating test for {filename}: {e}\n")
 
         # log completion time
@@ -247,7 +259,7 @@ def generate_test_for_file(model_name, prompt_text, filename, tests_folder, log_
         code_text = file.read()
 
     full_prompt = f"{prompt_text}\n\n{code_text}\n"
-    print(f"Generating test for {filename}...")
+    terminal_standard(f"Generating test for {filename}...")
 
     # stream output from the model
     stream = ollama.chat(
@@ -291,7 +303,7 @@ def check_ollama_status():
     else:
         ollama_status_label.config(text="Offline", fg="red")
     root.after(5000, check_ollama_status) # schedule this function to run again after 5000ms (5 seconds)
-    print("Checking status for Ollama...")
+    terminal_standard("Checking status for Ollama...")
 
 
 # GUI setup
