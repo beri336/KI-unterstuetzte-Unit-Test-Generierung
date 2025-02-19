@@ -13,6 +13,7 @@ import concurrent.futures # for parallel processing
 import threading # for GUI responsiveness
 import psutil # check Ollama-process
 import time # to measure time
+from datetime import datetime # get current date
 
 
 # global variables
@@ -101,6 +102,7 @@ def generate_tests_for_folder(model_name):
     Generates unit tests for all .py files in the selected folder using the specified AI model.
     """
     global folder_path
+
     if not folder_path:
         print("No folder selected.")
         return
@@ -112,17 +114,36 @@ def generate_tests_for_folder(model_name):
     os.makedirs(tests_folder, exist_ok=True)
 
     py_files = [f for f in os.listdir(folder_path) if f.endswith(".py")]
+    log_file_path = os.path.join(tests_folder, "generation_log.log") # initialize log file
 
-    # use concurrent futures to parallelize test generation
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder): file for file in py_files}
-        for future in concurrent.futures.as_completed(futures):
-            filename = futures[future]
-            try:
-                future.result()
-                print(f"Completed test generation for {filename}")
-            except Exception as e:
-                print(f"Error generating test for {filename}: {e}")
+    with open(log_file_path, "a", encoding="utf-8") as log_file:
+        start_time = datetime.now()
+        log_file.write(f"\n--- Test Generation Started ---\n")
+        log_file.write(f"Model: {model_name}\n")
+        log_file.write(f"Date: {start_time.strftime('%Y-%m-%d')}\n")
+        log_file.write(f"Start Time: {start_time.strftime('%H:%M:%S')}\n")
+        log_file.write(f"Folder: {folder_path}\n\n")
+
+        py_files = [f for f in os.listdir(folder_path) if f.endswith(".py")]
+
+        # use concurrent futures to parallelize test generation
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder, log_file): file for file in py_files}
+            for future in concurrent.futures.as_completed(futures):
+                filename = futures[future]
+                try:
+                    future.result()
+                    print(f"Completed test generation for {filename}")
+                    log_file.write(f"Completed: {filename} at {datetime.now().strftime('%H:%M:%S')}\n")
+                except Exception as e:
+                    print(f"Error generating test for {filename}: {e}")
+                    log_file.write(f"Error generating test for {filename}: {e}\n")
+        # log completion time
+        end_time = datetime.now()
+        elapsed_time = end_time - start_time
+        log_file.write(f"\n--- Test Generation Completed ---\n")
+        log_file.write(f"End Time: {end_time.strftime('%H:%M:%S')}\n")
+        log_file.write(f"Elapsed Time: {str(elapsed_time)}\n\n")
 
     # calculate total elapsed time
     elapsed_time = time.time() - generation_start_time
@@ -135,7 +156,7 @@ def generate_tests_for_folder(model_name):
     # revert status to "Ready" after 6 seconds
     root.after(6000, lambda: status_label.config(text="Ready"))
 
-def generate_test_for_file(model_name, prompt_text, filename, tests_folder):
+def generate_test_for_file(model_name, prompt_text, filename, tests_folder, log_file):
     file_path = os.path.join(folder_path, filename)
     with open(file_path, 'r', encoding='utf-8') as file:
         code_text = file.read()
@@ -170,6 +191,9 @@ def generate_test_for_file(model_name, prompt_text, filename, tests_folder):
     test_filename = os.path.join(tests_folder, f"unit_test_{os.path.splitext(filename)[0]}_{model_name}.py")
     with open(test_filename, "w", encoding="utf-8") as test_file:
         test_file.write("\n".join(python_code_lines))
+    
+    # log file creation
+    log_file.write(f"Generated: {test_filename} for {filename} at {datetime.now().strftime('%H:%M:%S')}\n")
 
 def check_ollama_status():
     """
