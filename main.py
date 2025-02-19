@@ -32,8 +32,6 @@ def terminal_standard(message):
 def terminal_error(message):
     print(f"\033[41m{message}\033[0m") 
 
-terminal_debugging("gregdjjjfjfjf")
-
 def chose_folder():
     """
     Opens a file dialog to select a folder containing Python files.
@@ -165,13 +163,31 @@ def generate_tests():
         terminal_error("Please select an AI model.")
         return
 
-    status_label.config(text="Generating, please wait...", fg="orange")
+    # inform about the total files found
+    py_files = []
+    for root, _, files in os.walk(folder_path):
+        if excluded_folder_path and os.path.commonpath([excluded_folder_path, root]) == excluded_folder_path:
+            continue
+
+        for file in files:
+            if file.endswith(".py"):
+                py_files.append(os.path.join(root, file))
+    
+    if not py_files:
+        terminal_error("No Python files found in the selected folder.")
+        return
+
+    total_files = len(py_files)
+    terminal_standard(f"Creating tests for {total_files} file(s): {', '.join(os.path.basename(f) for f in py_files)}")
+    
+    status_label.config(text=f"Generating, please wait... (0/{total_files})", fg="orange")
 
     # run the generation in a separate thread to keep GUI responsive
-    generation_thread = threading.Thread(target=generate_tests_for_folder, args=(selected_model,), daemon=True)
+    generation_thread = threading.Thread(target=generate_tests_for_folder, args=(selected_model, total_files), daemon=True)
     generation_thread.start()
 
     check_generation_completion() # start monitoring the thread
+
 
 
 def check_generation_completion():
@@ -187,7 +203,7 @@ def show_done_label():
     root.after(5000, lambda: status_label.config(text="Ready", fg="green")) # set back to "Ready" after 5 seconds
 
 
-def generate_tests_for_folder(model_name):
+def generate_tests_for_folder(model_name, total_files):
     """
     Generates unit tests for each Python file in the selected folder using the specified model.
     Creates a log file in the "Tests" folder to record the details of the generation process.
@@ -207,7 +223,6 @@ def generate_tests_for_folder(model_name):
     # collect all Python files, excluding files in the excluded folder
     py_files = []
     for root, _, files in os.walk(folder_path):
-        # skip the excluded folder
         if excluded_folder_path and os.path.commonpath([excluded_folder_path, root]) == excluded_folder_path:
             continue
 
@@ -231,12 +246,15 @@ def generate_tests_for_folder(model_name):
                 executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder, log_file): file
                 for file in py_files
             }
+            completed = 0
             for future in concurrent.futures.as_completed(futures):
                 filename = futures[future]
                 try:
                     future.result()
-                    terminal_standard(f"Test generation completed for {filename}")
+                    completed += 1
+                    terminal_standard(f"Test generation completed for {filename} ({completed}/{total_files})")
                     log_file.write(f"Completed: {filename} at {datetime.now().strftime('%M:%S')}\n")
+                    status_label.config(text=f"Generating, please wait... ({completed}/{total_files})", fg="orange")
                 except Exception as e:
                     terminal_error(f"Error generating test for {filename}: {e}")
                     log_file.write(f"Error generating test for {filename}: {e}\n")
@@ -247,6 +265,7 @@ def generate_tests_for_folder(model_name):
         log_file.write(f"\n--- Test Generation Completed ---\n")
         log_file.write(f"End Time: {end_time.strftime('%H:%M:%S')}\n")
         log_file.write(f"Elapsed Time: {str(elapsed_time)}\n\n")
+
 
 
 def generate_test_for_file(model_name, prompt_text, filename, tests_folder, log_file):
