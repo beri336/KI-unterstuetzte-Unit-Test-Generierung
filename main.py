@@ -9,6 +9,8 @@ from tkinter import filedialog, ttk
 import ollama
 import os
 import subprocess
+import concurrent.futures # for parallel processing
+import threading # for GUI responsiveness
 
 
 # global variables
@@ -60,7 +62,7 @@ def fetch_models():
         return model_names
     except subprocess.CalledProcessError as e:
         print(f"Fehler beim Abrufen der Modelle mit 'ollama list': {e}")
-        return []
+        return [] # empty list if fetching fails
 
 def on_model_select(event):
     """
@@ -68,10 +70,7 @@ def on_model_select(event):
     """
     global selected_model
     selected_model = combo_models.get()
-    if selected_model:
-        btn_generate.config(text=f"Generate Unit Test with '{selected_model}'")
-    else:
-        btn_generate.config(text="Generate")
+    btn_generate.config(text=f"Generate Unit Test with '{selected_model}'" if selected_model else "Generate")
 
 def generate_tests():
     """
@@ -81,7 +80,8 @@ def generate_tests():
         print("Please select an AI model.")
         return
 
-    generate_tests_for_folder(selected_model)
+    # run the generation in a separate thread to keep GUI responsive
+    threading.Thread(target=generate_tests_for_folder, args=(selected_model,), daemon=True).start()
 
 def generate_tests_for_folder(model_name):
     """
@@ -98,56 +98,60 @@ def generate_tests_for_folder(model_name):
     tests_folder = os.path.join(folder_path, "Tests")
     os.makedirs(tests_folder, exist_ok=True)
 
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".py"):
-            file_path = os.path.join(folder_path, filename)
+    py_files = [f for f in os.listdir(folder_path) if f.endswith(".py")]
 
-            with open(file_path, 'r', encoding='utf-8') as file:
-                code_text = file.read()
-
-            full_prompt = f"{prompt_text}\n\n{code_text}\n"
-
-            print(f"Generating test for {filename}...") # print progress in console
-
-            # stream response from model
-            stream = ollama.chat(
-                model=model_name,
-                messages=[{'role': 'user', 'content': full_prompt}],
-                stream=True,
-            )
-
-            generated_output = ""
-            for chunk in stream:
-                if 'message' in chunk and 'content' in chunk['message']:
-                    content = chunk['message']['content']
-                    generated_output += content
-
-            # extract Python code from generated output
-            python_code_lines = []
-            in_code_block = False
-
-            for line in generated_output.splitlines():
-                if line.strip() == "```python":
-                    in_code_block = True
-                    continue
-                elif line.strip() == "```" and in_code_block:
-                    in_code_block = False
-                    continue
-
-                if in_code_block:
-                    python_code_lines.append(line)
-
-            # save extracted Python code in the Tests folder
-            test_filename = os.path.join(tests_folder, f"unit_test_{os.path.splitext(filename)[0]}_{model_name}.py")
-            with open(test_filename, "w", encoding="utf-8") as test_file:
-                test_file.write("\n".join(python_code_lines))
-            print(f"Test for {filename} saved as {test_filename}.")
+    # use concurrent futures to parallelize test generation
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = {executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder): file for file in py_files}
+        for future in concurrent.futures.as_completed(futures):
+            filename = futures[future]
+            try:
+                future.result()
+                print(f"Completed test generation for {filename}")
+            except Exception as e:
+                print(f"Error generating test for {filename}: {e}")
     print("\nAll tests successfully generated.")
+
+def generate_test_for_file(model_name, prompt_text, filename, tests_folder):
+    file_path = os.path.join(folder_path, filename)
+    with open(file_path, 'r', encoding='utf-8') as file:
+        code_text = file.read()
+
+    full_prompt = f"{prompt_text}\n\n{code_text}\n"
+    print(f"Generating test for {filename}...")
+
+    stream = ollama.chat(
+        model=model_name,
+        messages=[{'role': 'user', 'content': full_prompt}],
+        stream=True,
+    )
+
+    generated_output = ""
+    for chunk in stream:
+        if 'message' in chunk and 'content' in chunk['message']:
+            generated_output += chunk['message']['content']
+
+    python_code_lines = []
+    in_code_block = False
+
+    for line in generated_output.splitlines():
+        if line.strip() == "```python":
+            in_code_block = True
+            continue
+        elif line.strip() == "```" and in_code_block:
+            in_code_block = False
+            continue
+        if in_code_block:
+            python_code_lines.append(line)
+
+    test_filename = os.path.join(tests_folder, f"unit_test_{os.path.splitext(filename)[0]}_{model_name}.py")
+    with open(test_filename, "w", encoding="utf-8") as test_file:
+        test_file.write("\n".join(python_code_lines))
 
 # GUI setup
 root = tk.Tk()
-root.minsize(580, 500)
-root.maxsize(580, 500)
+root.minsize(580, 380)
+root.maxsize(580, 380)
 root.title("AI Unit Test")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
@@ -193,7 +197,7 @@ lbl_model_select = tk.Label(frame_three, text="Select AI Model:", fg="white", fo
 lbl_model_select.pack(pady=5, anchor="w")
 
 combo_models = ttk.Combobox(frame_three, state="readonly", width=40)
-combo_models['values'] = fetch_models()  # Populate models from API
+combo_models['values'] = fetch_models() # populate models
 combo_models.pack(side="left")
 combo_models.bind("<<ComboboxSelected>>", on_model_select)
 
