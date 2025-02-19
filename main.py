@@ -5,14 +5,15 @@ Search for all .py-files in a directory and generate Unit-Tests with a chosen pr
 """
 
 import tkinter as tk
-from tkinter import filedialog
-from tkinter import scrolledtext
+from tkinter import filedialog, ttk
 import ollama
 import os
+import subprocess
 
 
 # global variables
 folder_path = None
+selected_model = None
 
 def chose_folder():
     """
@@ -44,12 +45,49 @@ def chose_prompt_file():
             tb_chosen_prompt_file.insert("1.0", file_content)
             tb_chosen_prompt_file.config(state="disabled")
 
+def fetch_models():
+    """
+    Fetch available models by running the `ollama list` command in the terminal.
+    """
+    try:
+        # executes `ollama list` in terminal
+        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=True)
+        
+        # loop through output lines and extract only the model name (first column)
+        model_names = [line.split()[0] for line in result.stdout.splitlines() if not line.startswith("NAME")]
+        
+        print(model_names)
+        return model_names
+    except subprocess.CalledProcessError as e:
+        print(f"Fehler beim Abrufen der Modelle mit 'ollama list': {e}")
+        return []
+
+def on_model_select(event):
+    """
+    Update the generate button text based on selected model.
+    """
+    global selected_model
+    selected_model = combo_models.get()
+    if selected_model:
+        btn_generate.config(text=f"Generate Unit Test with '{selected_model}'")
+    else:
+        btn_generate.config(text="Generate")
+
+def generate_tests():
+    """
+    Trigger the test generation process using the selected model.
+    """
+    if not selected_model:
+        print("Please select an AI model.")
+        return
+
+    generate_tests_for_folder(selected_model)
+
 def generate_tests_for_folder(model_name):
     """
-    Generates unit tests for all .py files in the selected folder using a specified AI model.
+    Generates unit tests for all .py files in the selected folder using the specified AI model.
     """
     global folder_path
-
     if not folder_path:
         print("No folder selected.")
         return
@@ -63,11 +101,12 @@ def generate_tests_for_folder(model_name):
     for filename in os.listdir(folder_path):
         if filename.endswith(".py"):
             file_path = os.path.join(folder_path, filename)
+
             with open(file_path, 'r', encoding='utf-8') as file:
                 code_text = file.read()
 
             full_prompt = f"{prompt_text}\n\n{code_text}\n"
-            
+
             print(f"Generating test for {filename}...") # print progress in console
 
             # stream response from model
@@ -86,6 +125,7 @@ def generate_tests_for_folder(model_name):
             # extract Python code from generated output
             python_code_lines = []
             in_code_block = False
+
             for line in generated_output.splitlines():
                 if line.strip() == "```python":
                     in_code_block = True
@@ -101,33 +141,8 @@ def generate_tests_for_folder(model_name):
             test_filename = os.path.join(tests_folder, f"unit_test_{os.path.splitext(filename)[0]}_{model_name}.py")
             with open(test_filename, "w", encoding="utf-8") as test_file:
                 test_file.write("\n".join(python_code_lines))
-
             print(f"Test for {filename} saved as {test_filename}.")
     print("\nAll tests successfully generated.")
-
-def generate_deepseek():
-    """
-    Generate Unit Test from Deepseek-Coder-V2:16b.
-    """
-    generate_tests_for_folder("deepseek-coder-v2:16b")
-
-def generate_gemma2():
-    """
-    Generate Unit Test from Gemma2:9b.
-    """
-    generate_tests_for_folder("gemma2:9b")
-
-def generate_llama3_2():
-    """
-    Generate Unit Test from LLama3.2:3b.
-    """
-    generate_tests_for_folder("llama3.2:latest")
-
-def generate_codegemma():
-    """
-    Generate Unit Test from Codegemma:7b.
-    """
-    generate_tests_for_folder("codegemma:latest")
 
 # GUI setup
 root = tk.Tk()
@@ -148,11 +163,14 @@ frame_two.pack(side="top", padx=10, pady=10, fill="x")
 frame_three = tk.Frame(main_frame)
 frame_three.pack(side="top", padx=10, pady=10, fill="x")
 
+frame_four = tk.Frame(main_frame)
+frame_four.pack(side="top", padx=10, pady=10, fill="x")
+
 # frame one - selected folder
 lbl_chosen_folder = tk.Label(frame_one, text="Selected Folder:", fg="white", font=("Arial", 12))
 lbl_chosen_folder.pack(pady=5, anchor="w")
 
-tb_chosen_folder = scrolledtext.ScrolledText(frame_one, height=2, width=40, wrap="word")
+tb_chosen_folder = tk.Text(frame_one, height=1.5, width=40, wrap="word")
 tb_chosen_folder.pack(side="left")
 tb_chosen_folder.config(state="disabled")
 
@@ -163,24 +181,24 @@ btn_folder.pack(side="left", padx=5)
 lbl_chosen_prompt_file = tk.Label(frame_two, text="Prompt File:", fg="white", font=("Arial", 12))
 lbl_chosen_prompt_file.pack(pady=5, anchor="w")
 
-tb_chosen_prompt_file = scrolledtext.ScrolledText(frame_two, height=10, width=40, wrap="word")
+tb_chosen_prompt_file = tk.Text(frame_two, height=5, width=40, wrap="word")
 tb_chosen_prompt_file.pack(side="left")
 tb_chosen_prompt_file.config(state="disabled")
 
 btn_prompt_file = tk.Button(frame_two, text="Choose Your Prompt File", command=chose_prompt_file)
 btn_prompt_file.pack(side="left", padx=5)
 
-# frame three - buttons for generating tests
-btn_ai_deepseek_dcv2 = tk.Button(frame_three, text="Generate Deepseek-Coder-v2", command=generate_deepseek)
-btn_ai_deepseek_dcv2.pack(side="top", pady=5, fill="x")
+# frame three - model selection dropdown
+lbl_model_select = tk.Label(frame_three, text="Select AI Model:", fg="white", font=("Arial", 12))
+lbl_model_select.pack(pady=5, anchor="w")
 
-btn_ai_gemma2 = tk.Button(frame_three, text="Generate Gemma2", command=generate_gemma2)
-btn_ai_gemma2.pack(side="top", pady=5, fill="x")
+combo_models = ttk.Combobox(frame_three, state="readonly", width=40)
+combo_models['values'] = fetch_models()  # Populate models from API
+combo_models.pack(side="left")
+combo_models.bind("<<ComboboxSelected>>", on_model_select)
 
-btn_ai_llama3_2 = tk.Button(frame_three, text="Generate LLama3.2", command=generate_llama3_2)
-btn_ai_llama3_2.pack(side="top", pady=5, fill="x")
-
-btn_ai_codegemma = tk.Button(frame_three, text="Generate CodeGemma", command=generate_codegemma)
-btn_ai_codegemma.pack(side="top", pady=5, fill="x")
+# frame four - generate button
+btn_generate = tk.Button(frame_four, text="Generate", command=generate_tests)
+btn_generate.pack(side="top", pady=5, fill="x")
 
 root.mainloop()
