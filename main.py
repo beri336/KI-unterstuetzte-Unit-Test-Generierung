@@ -22,21 +22,45 @@ selected_model = None
 
 def chose_folder():
     """
-    Function for selecting the folder containing all .py files.
+    Opens a file dialog to select a folder containing Python files.
+    If a folder is selected, it searches for a 'prompt' file with specific extensions (txt, md, doc) in that folder and loads it if found.
+    The selected folder path and any found prompt file are displayed in the GUI.
     """
     global folder_path
 
     folder_path = filedialog.askdirectory(title="Choose a Folder with Python Files")
     if folder_path:
+        # display the selected folder path in the textbox
         tb_chosen_folder.config(state="normal")
         tb_chosen_folder.delete("1.0", tk.END)
         tb_chosen_folder.insert("1.0", folder_path)
         tb_chosen_folder.config(state="disabled")
-    print(f"Your chosen file: '{folder_path}'")
+        
+        # search for a prompt-file in the selected folder
+        prompt_file_path = None
+        for ext in ["txt", "md", "doc"]:  # Allowed extensions
+            potential_path = os.path.join(folder_path, f"prompt.{ext}")
+            if os.path.exists(potential_path):
+                prompt_file_path = potential_path
+                break
+
+        # if a prompt-file is found, load it into the prompt textbox
+        if prompt_file_path:
+            with open(prompt_file_path, 'r', encoding='utf-8') as file:
+                file_content = file.read()
+                tb_chosen_prompt_file.config(state="normal")
+                tb_chosen_prompt_file.delete("1.0", tk.END)
+                tb_chosen_prompt_file.insert("1.0", file_content)
+                tb_chosen_prompt_file.config(state="disabled")
+            print(f"Automatically found prompt file: '{prompt_file_path}'")
+        else:
+            print("No prompt file found in the selected folder.")
+    print(f"Your selected folder: '{folder_path}'")
 
 def chose_prompt_file():
     """
-    Function for selecting the prompt file content.
+    Opens a file dialog to select a prompt file.
+    If a file is selected, its contents are loaded and displayed in the prompt text box in the GUI.
     """
     prompt_file_path = filedialog.askopenfilename(
         title="Choose Your Prompt file",
@@ -54,7 +78,9 @@ def chose_prompt_file():
 
 def fetch_models():
     """
-    Fetch available models by running the `ollama list` command in the terminal.
+    Fetches available AI models using the `ollama` command-line tool.
+    Returns a list of model names.
+    If an error occurs, prints an error message.
     """
     try:
         # executes `ollama list` in terminal
@@ -71,7 +97,8 @@ def fetch_models():
 
 def on_model_select(event):
     """
-    Update the generate button text based on selected model.
+    Updates the selected model when the user chooses an option from the combobox.
+    Adjusts the button text to reflect the chosen model.
     """
     global selected_model
     selected_model = combo_models.get()
@@ -80,7 +107,8 @@ def on_model_select(event):
 
 def generate_tests():
     """
-    Trigger the test generation process using the selected model.
+    Starts the test generation process by launching a new thread to handle test generation for the selected folder.
+    Updates the status label to inform the user that generation is in progress.
     """
     global generation_start_time
 
@@ -99,7 +127,8 @@ def generate_tests():
 
 def generate_tests_for_folder(model_name):
     """
-    Generates unit tests for all .py files in the selected folder using the specified AI model.
+    Generates unit tests for each Python file in the selected folder using the specified model.
+    Creates a log file in the "Tests" folder to record the details of the generation process.
     """
     global folder_path
 
@@ -114,7 +143,7 @@ def generate_tests_for_folder(model_name):
     os.makedirs(tests_folder, exist_ok=True)
 
     py_files = [f for f in os.listdir(folder_path) if f.endswith(".py")]
-    log_file_path = os.path.join(tests_folder, "generation_log.log") # initialize log file
+    log_file_path = os.path.join(tests_folder, f"utg-{model_name}.log") # initialize log file
 
     with open(log_file_path, "a", encoding="utf-8") as log_file:
         start_time = datetime.now()
@@ -126,7 +155,7 @@ def generate_tests_for_folder(model_name):
 
         py_files = [f for f in os.listdir(folder_path) if f.endswith(".py")]
 
-        # use concurrent futures to parallelize test generation
+        # use concurrent futures ThreadPoolExecutor to parallelize test generation
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = {executor.submit(generate_test_for_file, model_name, prompt_text, file, tests_folder, log_file): file for file in py_files}
             for future in concurrent.futures.as_completed(futures):
@@ -157,6 +186,10 @@ def generate_tests_for_folder(model_name):
     root.after(6000, lambda: status_label.config(text="Ready"))
 
 def generate_test_for_file(model_name, prompt_text, filename, tests_folder, log_file):
+    """
+    Generates a unit test for a single Python file by sending the code and prompt to the chosen model, then saving the result in the Tests folder.
+    Logs the generated test filename and completion time.
+    """
     file_path = os.path.join(folder_path, filename)
     with open(file_path, 'r', encoding='utf-8') as file:
         code_text = file.read()
@@ -197,7 +230,8 @@ def generate_test_for_file(model_name, prompt_text, filename, tests_folder, log_
 
 def check_ollama_status():
     """
-    Check if the Ollama process is running and update the status label.
+    Checks if the Ollama process is running and updates the status label in the GUI.
+    Schedules this function to run again every 10 seconds.
     """
     ollama_running = any("ollama" in proc.name().lower() for proc in psutil.process_iter(['name']))
     if ollama_running:
@@ -212,11 +246,12 @@ def check_ollama_status():
 
 # GUI setup
 root = tk.Tk()
-root.minsize(580, 460)
-root.maxsize(580, 460)
+root.minsize(570, 420) # X,Y
+root.maxsize(570, 420)
 root.title("AI Unit Test")
 root.protocol("WM_DELETE_WINDOW", root.destroy)
 
+# set up frames for GUI sections
 main_frame = tk.Frame(root)
 main_frame.pack(side="top", padx=10, pady=10, fill="x")
 
@@ -235,51 +270,48 @@ frame_four.pack(side="top", padx=10, pady=10, fill="x")
 frame_five = tk.Frame(main_frame)
 frame_five.pack(side="top", padx=10, pady=10, fill="x")
 
-frame_six = tk.Frame(main_frame)
-frame_six.pack(side="top", padx=10, pady=10, fill="x")
+# frame one - status label
+status_label = tk.Label(frame_one, text="Ready", fg="green", font=("Arial", 12))
+status_label.pack(side="left", anchor="w")
 
-# frame one - selected folder
-lbl_chosen_folder = tk.Label(frame_one, text="Selected Folder:", fg="white", font=("Arial", 12))
+# frame one - Ollama status label
+ollama_status_label = tk.Label(frame_one, text="Checking...", fg="orange", font=("Arial", 12))
+ollama_status_label.pack(side="right", anchor="e")
+
+# frame two - selected folder
+lbl_chosen_folder = tk.Label(frame_two, text="Selected Folder:", fg="white", font=("Arial", 12))
 lbl_chosen_folder.pack(pady=5, anchor="w")
 
-tb_chosen_folder = tk.Text(frame_one, height=1.5, width=40, wrap="word")
+tb_chosen_folder = tk.Text(frame_two, height=1.5, width=40, wrap="word")
 tb_chosen_folder.pack(side="left")
 tb_chosen_folder.config(state="disabled")
 
-btn_folder = tk.Button(frame_one, text="Choose Folder with Python Files", command=chose_folder)
+btn_folder = tk.Button(frame_two, text="Choose Folder with Python Files", command=chose_folder)
 btn_folder.pack(side="left", padx=5)
 
-# frame two - selected prompt
-lbl_chosen_prompt_file = tk.Label(frame_two, text="Prompt File:", fg="white", font=("Arial", 12))
+# frame three - selected prompt
+lbl_chosen_prompt_file = tk.Label(frame_three, text="Prompt File:", fg="white", font=("Arial", 12))
 lbl_chosen_prompt_file.pack(pady=5, anchor="w")
 
-tb_chosen_prompt_file = tk.Text(frame_two, height=5, width=40, wrap="word")
+tb_chosen_prompt_file = tk.Text(frame_three, height=5, width=40, wrap="word")
 tb_chosen_prompt_file.pack(side="left")
 tb_chosen_prompt_file.config(state="disabled")
 
-btn_prompt_file = tk.Button(frame_two, text="Choose Your Prompt File", command=chose_prompt_file)
+btn_prompt_file = tk.Button(frame_three, text="Choose Your Prompt File", command=chose_prompt_file)
 btn_prompt_file.pack(side="left", padx=5)
 
-# frame three - model selection dropdown
-lbl_model_select = tk.Label(frame_three, text="Select AI Model:", fg="white", font=("Arial", 12))
+# frame four - model selection dropdown
+lbl_model_select = tk.Label(frame_four, text="Select AI Model:", fg="white", font=("Arial", 12))
 lbl_model_select.pack(pady=5, anchor="w")
 
-combo_models = ttk.Combobox(frame_three, state="readonly", width=40)
+combo_models = ttk.Combobox(frame_four, state="readonly", width=40)
 combo_models['values'] = fetch_models() # populate models
 combo_models.pack(side="left")
 combo_models.bind("<<ComboboxSelected>>", on_model_select)
 
-# frame four - generate button
-btn_generate = tk.Button(frame_four, text="Generate", command=generate_tests)
+# frame five - generate button
+btn_generate = tk.Button(frame_five, text="Generate", command=generate_tests)
 btn_generate.pack(side="top", pady=5, fill="x")
-
-# frame five - status label
-status_label = tk.Label(frame_five, text="Ready", fg="green", font=("Arial", 12))
-status_label.pack(pady=5, anchor="w")
-
-# frame six - Ollama status label
-ollama_status_label = tk.Label(frame_six, text="Checking...", fg="orange", font=("Arial", 12))
-ollama_status_label.pack(pady=5, anchor="w")
 
 check_ollama_status() # Start the Ollama status check
 
