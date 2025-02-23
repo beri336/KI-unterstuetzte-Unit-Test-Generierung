@@ -592,7 +592,7 @@ def choose_folder():
     # If no folder was selected, cancel
     folder_path = filedialog.askdirectory(title="Choose a Folder with Python Files")
 
-    # ❌ Falls kein Ordner gewählt wurde, breche ab
+    # If no folder has been selected, cancel
     if not folder_path:
         output_terminal("Warning #5: No folder selected.", "bg_yellow")
         return
