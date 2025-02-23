@@ -228,7 +228,8 @@ def generate_tests_for_folder(model_name, total_files, py_files):
         return
 
     # If log storage is activated
-    log_file_path = os.path.join(tests_folder, f"utg-{model_name}.log") if checkbox_create_log.get() else None
+    formatted_model_name = format_model_name(model_name)
+    log_file_path = os.path.join(tests_folder, f"unit-test-{formatted_model_name}.log") if checkbox_create_log.get() else None
     log_file = open(log_file_path, "a", encoding="utf-8") if log_file_path else None
 
     # If Log is active, start it
@@ -380,6 +381,20 @@ def get_python_files(folder_path, excluded_folder_path):
 
     return py_files
 
+def format_model_name(model_name):
+    '''
+    Formats the model name by replacing invalid characters.
+
+    Parameters:
+    - model_name (str): The original name of the AI model.
+
+    This method:
+    - Replaces ":" with "_" to ensure compatibility with Windows file system.
+    - Returns the formatted model name without restricted characters.
+    '''
+    formatted_model_name = model_name.replace(":", "_")
+    return formatted_model_name
+
 def initialize_progress_bar(total_files):
     '''
     Initializes the progress bar for the test generation process.
@@ -477,12 +492,13 @@ def save_files(filename, model_name, tests_folder, prompt_text, code_text, gener
     global checkbox_save_raw, checkbox_create_log
 
     # Generated test file name
+    formatted_model_name = format_model_name(model_name)
     base_filename = os.path.basename(os.path.splitext(filename)[0])
-    test_filename = os.path.join(tests_folder, f"unit_test_{base_filename}_{model_name}.py")
+    test_filename = os.path.join(tests_folder, f"unit_test_{base_filename}_{formatted_model_name}.py")
 
     # If Markdown saving is activated
     if checkbox_save_raw.get():
-        md_filename = os.path.join(tests_folder, f"unit_test_{base_filename}_{model_name}.md")
+        md_filename = os.path.join(tests_folder, f"unit_test_{base_filename}_{formatted_model_name}.md")
         with open(md_filename, "w", encoding="utf-8") as md_file:
             md_file.write("# Unit Test Documentation\n")
             md_file.write(f"## Original File: {filename}\n\n")
