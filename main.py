@@ -119,10 +119,11 @@ def set_ollama_label(opt):
         ollama_status_label.configure(text="Ollama Online", text_color="green")
     elif opt == "Offline":
         ollama_status_label.configure(text="Ollama Offline", text_color="red")
+    elif opt == "PathError":
+        ollama_status_label.configure(text="Ollama Not Found on OS", text_color="red")
     else:
         ollama_status_label.configure(text="Error", text_color="grey")
         return
-
 
 # Functions - Generating Test
 def generate_tests():
@@ -786,6 +787,12 @@ def fetch_models():
         output_terminal(f"Info #24: Available AI models: {', '.join(model_names)}", "green")
 
         return model_names
+    
+    except FileNotFoundError as e:
+        # Error handling if ollama is not installed on OS
+        set_ollama_label("PathError")
+        output_terminal(f"Error #14: Ollama not found! Make sure Ollama is installed and added to the system PATH. - {e}", "bg_red")
+        return [] # Fallback: Return of an empty list
 
     except subprocess.CalledProcessError as e:
         # Error handling if `ollama list` fails
